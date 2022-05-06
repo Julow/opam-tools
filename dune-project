@@ -17,7 +17,8 @@
   dune-build-info
   rresult
   ocaml-version
-  fmt
+  (fmt
+    (>= 0.8.7))
   cmdliner
   fpath
   ezjsonm

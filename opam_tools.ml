@@ -33,7 +33,7 @@ let opam_tools_root = Fpath.(opam_root / "plugins" / "opam-tools")
 
 let opam_tools_src = Fpath.(opam_tools_root / "src")
 
-let tool_switch_name ov = Fmt.strf "opam-tools-%a" OV.pp ov
+let tool_switch_name ov = Fmt.str "opam-tools-%a" OV.pp ov
 
 let default_tools =
   [
@@ -81,7 +81,7 @@ let calculate_ocaml_compiler_from_project () =
   Ok ov
 
 let opam_file_for_ocaml prefix ov =
-  Fmt.strf
+  Fmt.str
     {|opam-version: "2.0"
 version: %S
 synopsis: "The OCaml compiler (installed by opam-tools)"
@@ -104,8 +104,8 @@ let install_ocaml_in_tools ov =
   let src = Fpath.(opam_tools_src / ("ocaml." ^ ovs)) in
   let system_src = Fpath.(opam_tools_src / ("ocaml-system." ^ ovs)) in
   let prefix = Fpath.(opam_tools_root / ovs) in
-  let pkg = Fmt.strf "ocaml-base-compiler.%s" ovs in
-  let system_pkg = Fmt.strf "ocaml-system.%s" ovs in
+  let pkg = Fmt.str "ocaml-base-compiler.%s" ovs in
+  let system_pkg = Fmt.str "ocaml-system.%s" ovs in
   OS.Path.delete ~recurse:true src >>= fun () ->
   Exec.run_opam Cmd.(v "source" % pkg % "--dir" % p src) >>= fun () ->
   OS.Path.delete ~recurse:true system_src >>= fun () ->

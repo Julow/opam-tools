@@ -33,7 +33,7 @@ let stream cmd =
   let _ = create_process bin args stdin stdout stderr in
   match wait () with
   | _, WEXITED 0 -> Ok ()
-  | _, WEXITED e -> Error (`Msg (Fmt.strf "Exited with code %d" e))
+  | _, WEXITED e -> Error (`Msg (Fmt.str "Exited with code %d" e))
   | _, _ -> Error (`Msg "Process terminated abruptly")
 
 let run_and_log_s cmd =
