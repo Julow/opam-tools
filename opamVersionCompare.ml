@@ -47,16 +47,16 @@ let extract_revision x =
    then letters, then anything else *)
 let compare_chars c1 c2 =
   match c1 with
-  | '~' -> ( match c2 with '~' -> 0 | _ -> -1 )
+  | '~' -> ( match c2 with '~' -> 0 | _ -> -1)
   | 'a' .. 'z' | 'A' .. 'Z' -> (
       match c2 with
       | '~' -> 1
       | 'a' .. 'z' | 'A' .. 'Z' -> Char.compare c1 c2
-      | _ -> -1 )
+      | _ -> -1)
   | _ -> (
       match c2 with
       | '~' | 'a' .. 'z' | 'A' .. 'Z' -> 1
-      | _ -> Char.compare c1 c2 )
+      | _ -> Char.compare c1 c2)
 
 (* return the first index of x, starting from xi, of a nun-null
  * character in x.  or (length x) in case x contains only 0's starting
@@ -105,7 +105,7 @@ let compare_chunks x y =
         | false, false ->
             (* continue comparing lexically *)
             let comp = compare_chars x.[xi] y.[yi] in
-            if comp = 0 then loop_lexical (xi + 1) (yi + 1) else comp )
+            if comp = 0 then loop_lexical (xi + 1) (yi + 1) else comp)
   and compare_numerical xi yi =
     assert (xi = xl || (xi < xl && x.[xi] <> '0'));
     (* leading zeros have been stripped *)

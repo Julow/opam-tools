@@ -1,16 +1,16 @@
 (* Copyright (c) Anil Madhavapeddy <anil@recoil.org>
 
-Permission to use, copy, modify, and distribute this software for any
-purpose with or without fee is hereby granted, provided that the above
-copyright notice and this permission notice appear in all copies.
+   Permission to use, copy, modify, and distribute this software for any
+   purpose with or without fee is hereby granted, provided that the above
+   copyright notice and this permission notice appear in all copies.
 
-THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
-WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
-MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
-ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
-WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
-ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
-OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE. *)
+   THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+   WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+   MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+   ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+   WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+   ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+   OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE. *)
 
 module OV = Ocaml_version
 open Rresult
@@ -30,9 +30,7 @@ let opam_root =
       exit 1
 
 let opam_tools_root = Fpath.(opam_root / "plugins" / "opam-tools")
-
 let opam_tools_src = Fpath.(opam_tools_root / "src")
-
 let tool_switch_name ov = Fmt.str "opam-tools-%a" OV.pp ov
 
 let default_tools =
@@ -142,11 +140,11 @@ let create_tools_switch ov =
 
 let ocamlformat_version_l =
   lazy
-    ( match OS.File.read_lines (Fpath.v ".ocamlformat") with
+    (match OS.File.read_lines (Fpath.v ".ocamlformat") with
     | Ok f ->
         List.filter_map (Astring.String.cut ~sep:"=") f
         |> List.assoc_opt "version"
-    | Error (`Msg _) -> None )
+    | Error (`Msg _) -> None)
 
 let ocamlformat_version () = Lazy.force ocamlformat_version_l
 
@@ -190,9 +188,9 @@ let setup_local_switch ov =
       Logs.info (fun l -> l "Creating local opam switch for project.");
       Exec.run_opam Cmd.(v "switch" % "create" % "." % "--empty") >>= fun () ->
       Exec.run_opam Cmd.(v "pin" % "add" % "-ny" % ".") >>= fun () ->
-      ( match ov with
+      (match ov with
       | Some ov -> Ok ov
-      | None -> calculate_ocaml_compiler_from_project () )
+      | None -> calculate_ocaml_compiler_from_project ())
       >>= fun ov ->
       install_ocaml_in_tools ov >>= fun () -> Ok ov
   | true -> (
@@ -221,7 +219,7 @@ let setup_local_switch ov =
                 "Local switch has a different OCaml version %a than the \
                  requested %a, so reinstalling it."
                 OV.pp ov_local OV.pp ov);
-          install_ocaml_in_tools ov >>= fun () -> Ok ov_local )
+          install_ocaml_in_tools ov >>= fun () -> Ok ov_local)
 
 let copy_binaries_for_package ov dst pkg =
   let sw = tool_switch_name ov in
@@ -265,7 +263,7 @@ let opam_version () =
   | _ -> (
       OpamVersionCompare.compare v "2.0.99" |> function
       | r when r <= 0 -> Ok `Opam_20
-      | _ -> Ok `Opam_21 )
+      | _ -> Ok `Opam_21)
 
 let main ~no_deps ~pin_tools tools ov =
   setup_local_switch ov >>= fun ov ->
@@ -290,7 +288,7 @@ let main ~no_deps ~pin_tools tools ov =
         Exec.stream
           Cmd.(
             v "opam" % "install" % "-y" % "." % "--deps-only" % "--with-test"
-            % "--with-doc") )
+            % "--with-doc"))
 
 open Cmdliner
 

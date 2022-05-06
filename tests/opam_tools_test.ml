@@ -3,7 +3,6 @@ open Rresult
 open R.Infix
 
 let opam = Cmd.(v "opam" % "exec" % "--")
-
 let opam_tools = Sys.getcwd () ^ "/" ^ Sys.argv.(1)
 
 let check = function

@@ -86,13 +86,11 @@ let ocaml_version ?ocamlc () =
       match Ocaml_version.of_string s with
       | Ok v -> Ok v
       | Error (`Msg _) ->
-          Error (`Msg "unable to parse OCaml string from ocamlc") )
+          Error (`Msg "unable to parse OCaml string from ocamlc"))
   | Error (`Msg _) -> Error (`Msg "unable to find an installed ocamlc")
 
 let run_opam args = run_and_log Cmd.(v "opam" %% args % "--color=never")
-
 let run_opam_s args = run_and_log_s Cmd.(v "opam" %% args % "--color=never")
-
 let run_opam_l args = run_and_log_l Cmd.(v "opam" %% args % "--color=never")
 
 let install_ocaml_to ~prefix ~src () =
