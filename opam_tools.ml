@@ -31,7 +31,6 @@ let opam_root =
 
 let opam_tools_root = Fpath.(opam_root / "plugins" / "opam-tools")
 let opam_tools_src = Fpath.(opam_tools_root / "src")
-let tool_switch_name ov = Fmt.str "opam-tools-%a" OV.pp ov
 
 let default_tools =
   [
@@ -127,17 +126,6 @@ let install_ocaml_in_tools ov =
   Exec.run_opam
     Cmd.(v "pin" % "add" % "-y" % "--inplace-build" % "ocaml-system" % p prefix)
 
-let create_tools_switch ov =
-  Exec.run_opam_l Cmd.(v "switch" % "list" % "-s") >>= fun all_sw ->
-  let sw = tool_switch_name ov in
-  match List.exists (( = ) sw) all_sw with
-  | true -> Ok ()
-  | false ->
-      Logs.info (fun l -> l "Creating switch %s to use for tools" sw);
-      let sw_compiler = OV.Opam.V2.name ov in
-      Exec.run_opam
-        Cmd.(v "switch" % "create" % sw % sw_compiler % "--no-switch")
-
 let ocamlformat_version_l =
   lazy
     (match OS.File.read_lines (Fpath.v ".ocamlformat") with
@@ -148,7 +136,7 @@ let ocamlformat_version_l =
 
 let ocamlformat_version () = Lazy.force ocamlformat_version_l
 
-let install_tools_in_tools_switch ~pin_tools tools ov =
+let install_tools_in_tools_switch sandbox ~pin_tools tools =
   (* ocamlformat has special version handling by detecting the .ocamlformat file *)
   let tools =
     match ocamlformat_version () with
@@ -156,7 +144,6 @@ let install_tools_in_tools_switch ~pin_tools tools ov =
     | Some v ->
         List.map (function "ocamlformat" -> "ocamlformat." ^ v | x -> x) tools
   in
-  let args = Cmd.(v "--switch" % tool_switch_name ov) in
   let pin_overrides =
     (* builtin overrides for tools not released yet *)
     [
@@ -175,11 +162,8 @@ let install_tools_in_tools_switch ~pin_tools tools ov =
         else (tool, pin_url) :: pin_tools)
       pin_tools pin_overrides
   in
-  Exec.iter
-    (fun (pkg, url) ->
-      Exec.run_opam Cmd.(v "pin" % "add" % "-ny" % pkg % url %% args))
-    pin_tools
-  >>= fun () -> Exec.run_opam Cmd.(v "install" % "-y" %% of_list tools %% args)
+  Exec.iter (fun (pkg, url) -> Sandbox_switch.pin sandbox ~pkg ~url) pin_tools
+  >>= fun () -> Sandbox_switch.install sandbox ~pkgs:tools
 
 let setup_local_switch ov =
   let local_switch = Fpath.v "_opam" in
@@ -221,10 +205,8 @@ let setup_local_switch ov =
                 OV.pp ov_local OV.pp ov);
           install_ocaml_in_tools ov >>= fun () -> Ok ov_local)
 
-let copy_binaries_for_package ov dst pkg =
-  let sw = tool_switch_name ov in
-  Exec.run_opam_l Cmd.(v "show" % "--list-files" % pkg % "--switch" % sw)
-  >>= fun paths ->
+let copy_binaries_for_package sandbox dst pkg =
+  Sandbox_switch.list_files sandbox ~pkg >>= fun paths ->
   let tocopy =
     List.filter_map
       (fun src ->
@@ -235,26 +217,18 @@ let copy_binaries_for_package ov dst pkg =
         else None)
       paths
   in
-  match tocopy with
-  | [] ->
-      Logs.err (fun l ->
-          l "Tool %s did not install any binaries for OCaml %a. Internal error."
-            pkg OV.pp ov);
-      exit 1
-  | (_, dst) :: _ as l ->
-      OS.Dir.create ~path:true (Fpath.parent dst) >>= fun _ ->
-      Exec.iter
-        (fun (target, dst) ->
-          Logs.debug (fun l ->
-              l "Linking %a <- %a" Fpath.pp dst Fpath.pp target);
-          OS.Path.link ~force:true ~target dst)
-        l
+  OS.Dir.create ~path:true (Fpath.parent dst) >>= fun _ ->
+  Exec.iter
+    (fun (target, dst) ->
+      Logs.debug (fun l -> l "Linking %a <- %a" Fpath.pp dst Fpath.pp target);
+      OS.Path.link ~force:true ~target dst)
+    tocopy
 
 let copy_tools_to_local_switch ~pin_tools tools ov =
-  create_tools_switch ov >>= fun () ->
-  install_tools_in_tools_switch tools ~pin_tools ov >>= fun () ->
+  Sandbox_switch.init ~ocaml_version:(OV.Opam.V2.name ov) >>= fun sandbox ->
+  install_tools_in_tools_switch sandbox ~pin_tools tools >>= fun () ->
   let dstdir = Fpath.(v "_opam" / "bin") in
-  Exec.iter (copy_binaries_for_package ov dstdir) tools
+  Exec.iter (copy_binaries_for_package sandbox dstdir) tools
 
 let opam_version () =
   Exec.run_opam_s Cmd.(v "--version") >>= fun v ->
