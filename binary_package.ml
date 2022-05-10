@@ -36,12 +36,18 @@ let make_binary_package sandbox repo ((pkg, ver) as bname) ~original_name =
     List.filter_map (process_path prefix) paths
     |> List.map Fpath.to_string |> String.concat ~sep:"\n"
   in
+  OS.Dir.create (Fpath.parent archive_path) >>= fun _ ->
   OS.Cmd.(
     in_string paths
-    |> run_in Cmd.(v "tar" % "-C" % "cf" % p archive_path % "-T" % "-"))
+    |> run_in
+         Cmd.(v "tar" % "cf" % p archive_path % "-C" % p prefix % "-T" % "-"))
   >>= fun () ->
-  let opam =
-    generate_opam_file original_name archive_path
-      (Sandbox_switch.ocaml_version sandbox)
-  in
-  Repo.add_package repo ~pkg ~ver opam
+  OS.File.exists archive_path >>= fun archive_created ->
+  if not archive_created then
+    Error (`Msg "Couldn't generate the package archive for unknown reason.")
+  else
+    let opam =
+      generate_opam_file original_name archive_path
+        (Sandbox_switch.ocaml_version sandbox)
+    in
+    Repo.add_package repo ~pkg ~ver opam

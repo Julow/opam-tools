@@ -139,10 +139,10 @@ let ocamlformat_version () = Lazy.force ocamlformat_version_l
 
 let update_tools_version tools =
   (* ocamlformat has special version handling by detecting the .ocamlformat file *)
-    match ocamlformat_version () with
-    | None -> tools
-    | Some v ->
-        List.map (function "ocamlformat" -> "ocamlformat." ^ v | x -> x) tools
+  match ocamlformat_version () with
+  | None -> tools
+  | Some v ->
+      List.map (function "ocamlformat" -> "ocamlformat." ^ v | x -> x) tools
 
 let do_pin_tools sandbox ~pin_tools =
   Exec.iter (fun (pkg, url) -> Sandbox_switch.pin sandbox ~pkg ~url) pin_tools
@@ -203,23 +203,23 @@ let binary_name_of_tool sandbox tool =
 let make_binary_package sandbox repo bname tool =
   if Binary_package.has_binary_package repo bname then Ok ()
   else
-    Sandbox_switch.install sandbox ~pkgs:[ tool ]
-    >>= fun () ->
+    Sandbox_switch.install sandbox ~pkgs:[ tool ] >>= fun () ->
     Binary_package.make_binary_package sandbox repo bname ~original_name:tool
 
 let install_binary_tool sandbox repo tool =
   binary_name_of_tool sandbox tool >>= fun bname ->
   make_binary_package sandbox repo bname tool >>= fun () ->
   Repo.with_repo_enabled repo (fun () ->
-      Exec.run_opam Cmd.(v "install" % "-y" % Binary_package.name_to_string bname))
+      Exec.run_opam
+        Cmd.(v "install" % "-y" % Binary_package.name_to_string bname))
 
 let install_binary_tools sandbox repo tools =
   Exec.iter (install_binary_tool sandbox repo) tools
 
 let copy_tools_to_local_switch ~pin_tools tools ov =
-let tools = update_tools_version tools in
+  let tools = update_tools_version tools in
   Repo.init () >>= fun repo ->
-  Sandbox_switch.init ~ocaml_version:(OV.Opam.V2.name ov) >>= fun sandbox ->
+  Sandbox_switch.init ~ocaml_version:(OV.to_string ov) >>= fun sandbox ->
   do_pin_tools sandbox ~pin_tools >>= fun () ->
   install_binary_tools sandbox repo tools
 
