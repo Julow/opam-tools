@@ -26,7 +26,8 @@
   ocaml-version
   (fmt
    (>= 0.8.7))
-  cmdliner
+  (cmdliner
+   (< 1.1.0))
   fpath
   ezjsonm
   bos))
