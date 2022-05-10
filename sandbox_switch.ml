@@ -5,6 +5,8 @@ type t = { ocaml_version : string }
 
 let switch_name ov = Fmt.str "opam-tools-%s" ov
 
+let ocaml_version t = t.ocaml_version
+
 let init ~ocaml_version =
   Exec.run_opam_l Cmd.(v "switch" % "list" % "-s") >>= fun all_sw ->
   let sw = switch_name ocaml_version in

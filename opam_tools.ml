@@ -13,6 +13,7 @@
    OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE. *)
 
 module OV = Ocaml_version
+open Astring
 open Rresult
 open R.Infix
 open Bos
@@ -136,14 +137,14 @@ let ocamlformat_version_l =
 
 let ocamlformat_version () = Lazy.force ocamlformat_version_l
 
-let install_tools_in_tools_switch sandbox ~pin_tools tools =
+let get_tools tools =
   (* ocamlformat has special version handling by detecting the .ocamlformat file *)
-  let tools =
     match ocamlformat_version () with
     | None -> tools
     | Some v ->
         List.map (function "ocamlformat" -> "ocamlformat." ^ v | x -> x) tools
-  in
+
+let do_pin_tools sandbox ~pin_tools =
   let pin_overrides =
     (* builtin overrides for tools not released yet *)
     [
@@ -163,7 +164,6 @@ let install_tools_in_tools_switch sandbox ~pin_tools tools =
       pin_tools pin_overrides
   in
   Exec.iter (fun (pkg, url) -> Sandbox_switch.pin sandbox ~pkg ~url) pin_tools
-  >>= fun () -> Sandbox_switch.install sandbox ~pkgs:tools
 
 let setup_local_switch ov =
   let local_switch = Fpath.v "_opam" in
@@ -205,30 +205,40 @@ let setup_local_switch ov =
                 OV.pp ov_local OV.pp ov);
           install_ocaml_in_tools ov >>= fun () -> Ok ov_local)
 
-let copy_binaries_for_package sandbox dst pkg =
-  Sandbox_switch.list_files sandbox ~pkg >>= fun paths ->
-  let tocopy =
-    List.filter_map
-      (fun src ->
-        let dir, file = Fpath.v src |> Fpath.split_base in
-        let _, dtype = Fpath.split_base dir in
-        if Fpath.to_string dtype = "bin/" then
-          Some (Fpath.v src, Fpath.(dst // file))
-        else None)
-      paths
-  in
-  OS.Dir.create ~path:true (Fpath.parent dst) >>= fun _ ->
-  Exec.iter
-    (fun (target, dst) ->
-      Logs.debug (fun l -> l "Linking %a <- %a" Fpath.pp dst Fpath.pp target);
-      OS.Path.link ~force:true ~target dst)
-    tocopy
+let list_last = function
+  | [] -> assert false
+  | hd :: tl -> List.fold_left (fun _ x -> x) hd tl
+
+let binary_name_of_tool sandbox tool =
+  (match String.cut ~sep:"." tool with
+  | Some nv -> Ok nv
+  | None ->
+      Exec.run_and_log_l
+        Cmd.(v "show" % "--all-versions" % "-f" % "version" % tool)
+      >>= fun versions -> Ok (tool, list_last versions))
+  >>= fun (name, ver) -> Ok (Binary_package.binary_name sandbox ~name ~ver)
+
+let make_binary_package sandbox repo bname tool =
+  if Binary_package.has_binary_package repo bname then Ok ()
+  else
+    Sandbox_switch.install sandbox ~pkgs:[ tool ]
+    >>= fun () ->
+    Binary_package.make_binary_package sandbox repo bname ~original_name:tool
+
+let install_binary_tool sandbox repo tool =
+  binary_name_of_tool sandbox tool >>= fun bname ->
+  make_binary_package sandbox repo bname tool >>= fun () ->
+  Repo.with_repo_enabled repo (fun () ->
+      Exec.run_opam Cmd.(v "install" % "-y" % Binary_package.name_to_string bname))
+
+let install_binary_tools sandbox repo tools =
+  Exec.iter (install_binary_tool sandbox repo) tools
 
 let copy_tools_to_local_switch ~pin_tools tools ov =
+  Repo.init () >>= fun repo ->
   Sandbox_switch.init ~ocaml_version:(OV.Opam.V2.name ov) >>= fun sandbox ->
-  install_tools_in_tools_switch sandbox ~pin_tools tools >>= fun () ->
-  let dstdir = Fpath.(v "_opam" / "bin") in
-  Exec.iter (copy_binaries_for_package sandbox dstdir) tools
+  do_pin_tools sandbox ~pin_tools >>= fun () ->
+  install_binary_tools sandbox repo tools
 
 let opam_version () =
   Exec.run_opam_s Cmd.(v "--version") >>= fun v ->
