@@ -137,7 +137,7 @@ let ocamlformat_version_l =
 
 let ocamlformat_version () = Lazy.force ocamlformat_version_l
 
-let get_tools tools =
+let update_tools_version tools =
   (* ocamlformat has special version handling by detecting the .ocamlformat file *)
     match ocamlformat_version () with
     | None -> tools
@@ -145,24 +145,6 @@ let get_tools tools =
         List.map (function "ocamlformat" -> "ocamlformat." ^ v | x -> x) tools
 
 let do_pin_tools sandbox ~pin_tools =
-  let pin_overrides =
-    (* builtin overrides for tools not released yet *)
-    [
-      ("ocaml-lsp-server", "https://github.com/ocaml/ocaml-lsp.git");
-      ("duniverse", "https://github.com/ocamllabs/duniverse.git");
-    ]
-  in
-  let pin_tools =
-    List.fold_left
-      (fun pin_tools (tool, pin_url) ->
-        if
-          List.exists
-            (fun (pkg, _) -> Astring.String.is_prefix ~affix:tool pkg)
-            pin_tools
-        then pin_tools
-        else (tool, pin_url) :: pin_tools)
-      pin_tools pin_overrides
-  in
   Exec.iter (fun (pkg, url) -> Sandbox_switch.pin sandbox ~pkg ~url) pin_tools
 
 let setup_local_switch ov =
@@ -235,6 +217,7 @@ let install_binary_tools sandbox repo tools =
   Exec.iter (install_binary_tool sandbox repo) tools
 
 let copy_tools_to_local_switch ~pin_tools tools ov =
+let tools = update_tools_version tools in
   Repo.init () >>= fun repo ->
   Sandbox_switch.init ~ocaml_version:(OV.Opam.V2.name ov) >>= fun sandbox ->
   do_pin_tools sandbox ~pin_tools >>= fun () ->

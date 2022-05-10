@@ -14,7 +14,7 @@ let repo_name = "platform-cache"
 let repo_path = Fpath.v "./cache_repo"
 
 let init () =
-  OS.Dir.exists repo_path  >>= fun initialized ->
+  OS.Dir.exists repo_path >>= fun initialized ->
   if initialized then Ok repo_path
   else
     init_repo repo_path >>= fun _ ->
@@ -22,8 +22,7 @@ let init () =
       Cmd.(
         v "repository" % "add" % "--dont-select" % "-k" % "local" % "-y"
         % repo_name % p repo_path)
-    >>= fun () ->
-    Ok repo_path
+    >>= fun () -> Ok repo_path
 
 let repo_path_of_pkg t ~pkg ~ver =
   Fpath.(t / "packages" / pkg / (pkg ^ "." ^ ver))
