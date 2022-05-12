@@ -27,8 +27,8 @@ module Opam_file = struct
   let gen_url ppf url = fpf ppf "{@ src: %S@ }" (Fpath.to_string url)
 
   let v ?install ?depends ?conflicts ?url ~opam_version ~pkg_name ppf () =
-    field ppf "opam-version" gen_string opam_version;
-    field ppf "name" gen_string pkg_name;
+    field ppf "opam-version:" gen_string opam_version;
+    field ppf "name:" gen_string pkg_name;
     field_opt ppf "install:" (gen_list (gen_list gen_string)) install;
     field_opt ppf "depends:" (gen_list gen_dep) depends;
     field_opt ppf "conflicts:" (gen_list gen_string) conflicts;
@@ -72,8 +72,10 @@ let has_pkg t ~pkg ~ver =
   | Error _ -> false
 
 let add_package t ~pkg ~ver opam =
+  let repo_path = repo_path_of_pkg t ~pkg ~ver in
+  OS.Dir.create repo_path >>= fun _ ->
   OS.File.writef
-    (repo_path_of_pkg t ~pkg ~ver)
+    Fpath.(repo_path / "opam")
     "%a"
     (opam ~opam_version ~pkg_name:pkg)
     ()
@@ -83,5 +85,5 @@ let with_repo_enabled _ f =
   let unselect_repo () =
     ignore (Exec.run_opam Cmd.(v "repository" % "remove" % repo_name))
   in
-  Exec.run_opam Cmd.(v "repository" % "add" % repo_name) >>= fun () ->
-  Fun.protect ~finally:unselect_repo f
+  Exec.run_opam Cmd.(v "repository" % "add" % repo_name % p repo_path)
+  >>= fun () -> Fun.protect ~finally:unselect_repo f
