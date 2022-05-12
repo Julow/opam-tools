@@ -237,19 +237,25 @@ let verify_constraint version constraint_ =
 let verify_constraints version constraints =
   List.for_all (verify_constraint version) constraints
 
+let parse_pkg_name_ver s =
+  match String.cut ~sep:"." s with
+  | Some (n, v) -> (n, Some v)
+  | None -> (s, None)
+
 let binary_name_of_tool sandbox tool =
-  (match String.cut ~sep:"." tool with
-  | Some nv -> Ok nv
+  let name, ver = parse_pkg_name_ver tool in
+  (match ver with
+  | Some ver -> Ok ver
   | None ->
-      Exec.run_opam_s Cmd.(v "show" % "-f" % "available-versions" % tool)
-      >>= fun versions ->
+      Exec.run_opam_s Cmd.(v "show" % "-f" % "available-versions" % name)
+      >>| fun versions ->
       let version =
         String.cuts ~sep:"  " versions
         |> List.rev
         |> List.find (fun version ->
                let ocaml_depends =
                  Exec.run_opam_l
-                   Cmd.(v "show" % "-f" % "depends:" % (tool ^ "." ^ version))
+                   Cmd.(v "show" % "-f" % "depends:" % (name ^ "." ^ version))
                  >>| List.find_opt (String.is_prefix ~affix:"\"ocaml\"")
                in
                match ocaml_depends with
@@ -264,14 +270,15 @@ let binary_name_of_tool sandbox tool =
                | Ok None -> true
                | _ -> false)
       in
-      Ok (tool, version))
-  >>= fun (name, ver) -> Ok (Binary_package.binary_name sandbox ~name ~ver)
+      version)
+  >>| fun ver -> Binary_package.binary_name sandbox ~name ~ver
 
 let make_binary_package sandbox repo bname tool =
   if Binary_package.has_binary_package repo bname then Ok ()
   else
     Sandbox_switch.install sandbox ~pkgs:[ tool ] >>= fun () ->
-    Binary_package.make_binary_package sandbox repo bname ~original_name:tool
+    let original_name = parse_pkg_name_ver tool in
+    Binary_package.make_binary_package sandbox repo bname ~original_name
 
 let install_binary_tool sandbox repo tool =
   binary_name_of_tool sandbox tool >>= fun bname ->

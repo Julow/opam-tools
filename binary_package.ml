@@ -12,11 +12,11 @@ let binary_name sandbox ~name ~ver =
 let name_to_string (name, ver) = name ^ "." ^ ver
 let has_binary_package repo (name, ver) = Repo.has_pkg repo ~pkg:name ~ver
 
-let generate_opam_file pkg archive_path ocaml_version =
+let generate_opam_file original_name archive_path ocaml_version =
   Repo.Opam_file.v
     ~install:[ [ "cp"; "-aT"; "."; "%{prefix}%" ] ]
     ~depends:[ ("ocaml", Some ("=", ocaml_version)) ]
-    ~conflicts:[ pkg ] ~url:archive_path
+    ~conflicts:[ original_name ] ~url:archive_path
 
 let should_remove = Fpath.(is_prefix (v "lib"))
 
@@ -27,7 +27,8 @@ let process_path prefix path =
       if should_remove path then None else Some Fpath.(base prefix // path)
 
 (** Binary is already in the sandbox. Add this binary as a package in the local repo  *)
-let make_binary_package sandbox repo ((pkg, ver) as bname) ~original_name =
+let make_binary_package sandbox repo ((pkg, ver) as bname)
+    ~original_name:(original_name, _) =
   let prefix = Sandbox_switch.switch_path_prefix sandbox in
   (* TODO *)
   let archive_path =
@@ -53,6 +54,7 @@ let make_binary_package sandbox repo ((pkg, ver) as bname) ~original_name =
     Error (`Msg "Couldn't generate the package archive for unknown reason.")
   else
     let opam =
-      generate_opam_file pkg archive_path (Sandbox_switch.ocaml_version sandbox)
+      generate_opam_file original_name archive_path
+        (Sandbox_switch.ocaml_version sandbox)
     in
     Repo.add_package repo ~pkg ~ver opam

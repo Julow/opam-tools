@@ -12,7 +12,7 @@ val make_binary_package :
   Sandbox_switch.t ->
   Repo.t ->
   name ->
-  original_name:string ->
+  original_name:string * string option ->
   (unit, 'e) OS.result
 (** Make a binary package from the result of installing a package in the sandbox
     switch. *)
