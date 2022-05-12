@@ -195,8 +195,7 @@ let binary_name_of_tool sandbox tool =
   (match String.cut ~sep:"." tool with
   | Some nv -> Ok nv
   | None ->
-      Exec.run_and_log_l
-        Cmd.(v "show" % "--all-versions" % "-f" % "version" % tool)
+      Exec.run_opam_l Cmd.(v "show" % "-f" % "version" % tool)
       >>= fun versions -> Ok (tool, list_last versions))
   >>= fun (name, ver) -> Ok (Binary_package.binary_name sandbox ~name ~ver)
 
