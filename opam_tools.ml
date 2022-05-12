@@ -188,15 +188,83 @@ let setup_local_switch ov =
           install_ocaml_in_tools ov >>= fun () -> Ok ov_local)
 
 let list_last = function
-  | [] -> assert false
+  | [] ->
+      Logs.debug (fun m -> m "No version");
+      assert false
   | hd :: tl -> List.fold_left (fun _ x -> x) hd tl
+
+let parse_constraints s =
+  let open Angstrom in
+  let is_whitespace = function
+    | '\x20' | '\x0a' | '\x0d' | '\x09' -> true
+    | _ -> false
+  in
+  let whitespace = take_while is_whitespace in
+  let whitespaced p = whitespace *> p <* whitespace in
+  let quoted p = whitespaced @@ (char '"' *> p) <* char '"' in
+  let bracketed p = whitespaced @@ (char '{' *> p) <* char '}' in
+  let quoted_ocaml = quoted @@ string "ocaml" in
+  let quoted_version =
+    quoted @@ take_till (( = ) '"') >>| fun version_string ->
+    OV.of_string_exn version_string
+  in
+  let is_comparator = function '<' | '>' | '=' -> true | _ -> false in
+  let comparator =
+    whitespaced @@ peek_char >>= function
+    | Some c ->
+        if is_comparator c then
+          take_till is_whitespace >>= function
+          | ("<" | "<=" | ">" | ">=" | "=") as e -> return (Some e)
+          | _ -> fail "not a comparator"
+        else return None
+    | None -> return None
+  in
+  let constraint_ = both comparator quoted_version in
+  let constraints = sep_by (whitespaced @@ char '&') constraint_ in
+  let finally = quoted_ocaml *> bracketed constraints <* end_of_input in
+  match parse_string ~consume:Consume.All finally s with
+  | Ok a -> Ok a
+  | Error m -> Error (`Msg m)
+
+let verify_constraint version constraint_ =
+  match constraint_ with
+  | Some "<=", constraint_version -> OV.compare version constraint_version < 1
+  | Some "<", constraint_version -> OV.compare version constraint_version < 0
+  | Some ">=", constraint_version -> OV.compare version constraint_version > -1
+  | Some ">", constraint_version -> OV.compare version constraint_version > 0
+  | _ -> failwith "impossible"
+
+let verify_constraints version constraints =
+  List.for_all (verify_constraint version) constraints
 
 let binary_name_of_tool sandbox tool =
   (match String.cut ~sep:"." tool with
   | Some nv -> Ok nv
   | None ->
-      Exec.run_opam_l Cmd.(v "show" % "-f" % "version" % tool)
-      >>= fun versions -> Ok (tool, list_last versions))
+      Exec.run_opam_s Cmd.(v "show" % "-f" % "available-versions" % tool)
+      >>= fun versions ->
+      let version =
+        String.cuts ~sep:"  " versions
+        |> List.rev
+        |> List.find (fun version ->
+               let ocaml_depends =
+                 Exec.run_opam_l
+                   Cmd.(v "show" % "-f" % "depends:" % (tool ^ "." ^ version))
+                 >>| List.find_opt (String.is_prefix ~affix:"\"ocaml\"")
+               in
+               match ocaml_depends with
+               | Ok (Some ocaml_constraint) ->
+                   let result =
+                     parse_constraints ocaml_constraint >>= fun constraints ->
+                     OV.of_string @@ Sandbox_switch.ocaml_version sandbox
+                     >>| fun sandbox_version ->
+                     verify_constraints sandbox_version constraints
+                   in
+                   Result.value ~default:false result
+               | Ok None -> true
+               | _ -> false)
+      in
+      Ok (tool, version))
   >>= fun (name, ver) -> Ok (Binary_package.binary_name sandbox ~name ~ver)
 
 let make_binary_package sandbox repo bname tool =

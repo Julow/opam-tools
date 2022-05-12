@@ -30,4 +30,5 @@
    (< 1.1.0))
   fpath
   ezjsonm
-  bos))
+  bos
+  angstrom))
